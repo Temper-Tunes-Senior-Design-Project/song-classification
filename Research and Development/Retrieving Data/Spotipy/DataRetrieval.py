@@ -2,6 +2,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import pandas as pd
 import warnings
+import os
 #ignoring the warning that the DataFrame.append() method is deprecated and will eventually be removed.
 warnings.filterwarnings(action='ignore', category=FutureWarning)
 
@@ -28,7 +29,7 @@ def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x',usingAudioAna
 
         moreSongsToLoad, killCount = infLoopCheck(killCount, moreSongsToLoad)
         
-    exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation)
+    exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation,affect)
     
 
 #NOTE: this is directly relying on the dictionaries being consistent
@@ -76,19 +77,30 @@ def checkForMoreSongs(playlist,playlistID, currOffset):
         print("Problem determining playlist size!")
         return False, playlist, currOffset
 
-def exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation):
+def exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation,affect):
     if dataSubFolderLocation != '' and dataSubFolderLocation[-1] !='/':
         dataSubFolderLocation += '/'
+    elif dataSubFolderLocation =='':
+        dataSubFolderLocation = f'{affect}/'
     
     if usingAudioAnalysis:
         if CSVFileName == 'x':
-            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Pytorch Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/' + dataSubFolderLocation+ playlistName + '.csv'
+            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/' + dataSubFolderLocation+ playlistName
         else:
-            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Pytorch Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/'+ dataSubFolderLocation + CSVFileName
+            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/'+ dataSubFolderLocation + CSVFileName
     elif CSVFileName == 'x':
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Pytorch Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + playlistName + '.csv'
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + playlistName 
     else:
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Pytorch Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + CSVFileName
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + CSVFileName
+    
+
+    if CSVFilePath[-4:] != '.csv':
+        CSVFilePath += '.csv'
+    
+    #print the path to the csv file
+    print(CSVFilePath)
+
+    #
 
     df.to_csv(CSVFilePath, index=False)
     print('Warning: I did not add a check to see if .csv file alread exists so it will overwrite the file if it already exists!')
@@ -113,13 +125,12 @@ def makeAudioOrFeatureDF(usingAudioAnalysis):
 ############################################      "MAIN"      #######################################################
 
 
-playlistID = 'https://open.spotify.com/playlist/3jxJ5VOEudOS5iWfq27deI?si=5a9884f2774348c9'
-CSVFile = 'Rock Testing Concat.csv'
+playlistID = 'https://open.spotify.com/playlist/1XeIgTMom38iefhap6vrg0?si=77f58c8466bf4c7f'
+#CSVFile = 'Rock Testing Concat.csv'
 
-affect = ['sad','happy']
+affect = ['sad','anxious','energetic','excited','happy','calm','relaxed','depressed']
 #getSongMetadataFromPlaylist(playlistID, affect[1], CSVFile, usingAudioAnalysis=True)
 #dont have to use custom csv filename, as shown below!
 
-#getSongMetadataFromPlaylist(playlistID, affect[0], dataSubFolderLocation='Rock')
-
-
+getSongMetadataFromPlaylist(playlistID, affect[7])
+#print the current directory
