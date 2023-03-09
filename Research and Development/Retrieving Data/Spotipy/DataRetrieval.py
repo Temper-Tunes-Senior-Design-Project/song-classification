@@ -1,131 +1,95 @@
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import pandas as pd
-import warnings
-import os
-#ignoring the warning that the DataFrame.append() method is deprecated and will eventually be removed.
-warnings.filterwarnings(action='ignore', category=FutureWarning)
 
 
 #need to have credentials to access API
 sp = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials('bf1ba68423404778a60bcf3dee58d199','7365dc611a2d4ddba4ad61343f0b64d7'))
 
 #NOTE: playlistID is a string, preferably uri/url over href; HARD CODED PERSONAL PATH EXPORTING CSV and I expect CSVFileName to end in .csv
-def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x',usingAudioAnalysis=False, dataSubFolderLocation = ''): 
-    playlist = sp.playlist_tracks(playlistID)['items']
+def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x', dataSubFolderLocation = 'emotions'): 
+    playlistBatches = getAllTracksFromPlaylist(playlistID)
     playlistName = sp.playlist(playlistID)['name']
 
-    df = makeAudioOrFeatureDF(usingAudioAnalysis) 
-    moreSongsToLoad = True
-    currOffset = 0
-    songDataExtractedCount =0
-    killCount = 0
+    allSongFeatures = []
     
-    while moreSongsToLoad:
+    for playlistBatch in playlistBatches:
         
-        df, playlist, songDataExtractedCount = getSongData(playlist, playlistName, df,affect,usingAudioAnalysis, songDataExtractedCount)
-
-        moreSongsToLoad, playlist, currOffset = checkForMoreSongs(playlist,playlistID, currOffset)
-
-        moreSongsToLoad, killCount = infLoopCheck(killCount, moreSongsToLoad)
+        allSongFeatures.extend(getSongData(playlistBatch, playlistName, affect))
         
-    exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation,affect)
+    df = pd.DataFrame(allSongFeatures)
+
+    CSVFilePath = exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect)
+
+    df.to_csv(CSVFilePath, index=False)
     
-
-#NOTE: this is directly relying on the dictionaries being consistent
-#no error/exception handling being done here
-def getSongData( playlist, playlistName,df,affect,usingAudioAnalysis, songDataExtractedCount=0):
-    for song in playlist:
-        songName = song['track']['name']
-
-        songURI=song['track']['uri']
-
-        if usingAudioAnalysis:
-            # (currently unsure how its breaking it down in excel file!!!)
-            featuresOrAnalysis = sp.audio_analysis(songURI)
-            print(featuresOrAnalysis)
-        else:
-            featuresOrAnalysis = sp.audio_features(songURI)[0]
-
-        featuresOrAnalysis['song'] = songName
-        featuresOrAnalysis['playlist']= playlistName
-        featuresOrAnalysis['affect'] = affect
-
-        #seriesToJoin = pd.Series(featuresOrAnalysis)
-        #df = pd.concat([df,seriesToJoin], ignore_index=True)
-        #NOTE: df.append is going to be removed in the future, but i cant currently get it to work the preferred way using pd.concat
-
-        df = df.append(featuresOrAnalysis, ignore_index=True)
+    print('Warning: I did not add a check to see if .csv file alread exists so it will overwrite the file if it already exists!')
+    print('Extracted', len(df), 'songs metadata from', playlistName,'.')
+    return df
 
 
-        songDataExtractedCount +=1
-        print(songDataExtractedCount)
-        if usingAudioAnalysis:
-            print('Currently I have a break line to only retreive the audio analysis of the first song in a playlist since I havent used it much')
+def getAllTracksFromPlaylist(playlistID):
+    tracks = []
+    offset = 0
+    limit = 100
+    
+    while True:
+        playlist = sp.playlist_tracks(playlistID, offset=offset, limit=limit)['items']
+        tracks.append(playlist)
+        
+        if len(playlist) < limit:
             break
-    return df, playlist, songDataExtractedCount
+            
+        offset += limit
+        print("obtained batch", offset//limit, "of songs")
+    return tracks
 
-#NOTE: the songs of a playlist r broken up into batches of 100
-def checkForMoreSongs(playlist,playlistID, currOffset):
-    if len(playlist) < 100 and len(playlist)>-1 :
-        return False, playlist, currOffset
-    elif len(playlist) == 100:
-        currOffset +=100
-        playlist = sp.playlist_tracks(playlistID, offset=currOffset)['items']
-        return True, playlist, currOffset
-    else:
-        print("Problem determining playlist size!")
-        return False, playlist, currOffset
 
-def exportToCSV(playlistName, usingAudioAnalysis, df, songDataExtractedCount, CSVFileName, dataSubFolderLocation,affect):
+def getSongData(playlist, playlistName,  affect ):
+    songDataExtractedCount=0
+    song_uris = []
+    valid_song_indexes = []
+    for i, song in enumerate(playlist):
+        if song['track'] is not None:
+            song_uris.append(song['track']['uri'])
+            valid_song_indexes.append(i)
+    song_features = sp.audio_features(song_uris)
+    song_features_with_metadata_batch = []
+    for i, feature in enumerate(song_features):
+        if feature is not None:
+            song_index = valid_song_indexes[i]
+            songName = playlist[song_index]['track']['name']
+            song_features_with_metadata_batch.append(feature)
+            song_features_with_metadata_batch[-1]['song'] = songName
+            song_features_with_metadata_batch[-1]['playlist'] = playlistName
+            song_features_with_metadata_batch[-1]['affect'] = affect
+            songDataExtractedCount += 1
+    print(f"{songDataExtractedCount} of {len(playlist)} in batch extracted")
+    
+    return song_features_with_metadata_batch
+
+
+def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
     if dataSubFolderLocation != '' and dataSubFolderLocation[-1] !='/':
-        dataSubFolderLocation += '/'
+        dataSubFolderLocation += f'/{affect}/'
+        #this assumes affect is supposed to be part of subfolder name
     elif dataSubFolderLocation =='':
         dataSubFolderLocation = f'{affect}/'
     
-    if usingAudioAnalysis:
-        if CSVFileName == 'x':
-            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/' + dataSubFolderLocation+ playlistName
-        else:
-            CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/'+ dataSubFolderLocation + CSVFileName
-    elif CSVFileName == 'x':
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + playlistName 
+    if CSVFileName == 'x':
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/' + dataSubFolderLocation+ playlistName
     else:
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation + CSVFileName
-    
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/'+ dataSubFolderLocation + CSVFileName
 
     if CSVFilePath[-4:] != '.csv':
         CSVFilePath += '.csv'
-    
-    #print the path to the csv file
-    print(CSVFilePath)
-
-    #
-
-    df.to_csv(CSVFilePath, index=False)
-    print('Warning: I did not add a check to see if .csv file alread exists so it will overwrite the file if it already exists!')
-    print('Extracted', songDataExtractedCount, 'songs metadata from', playlistName,'.')
-
-def infLoopCheck(killCount,moreSongsToLoad):
-    if moreSongsToLoad:
-        killCount +=1
-        if killCount>10:
-            print("Looped 10 times and could not finish looking at playlist data.  Either playlist over 1k songs OR ERROR!")
-            return False, killCount
-        return True, killCount
-    return moreSongsToLoad, killCount
-
-def makeAudioOrFeatureDF(usingAudioAnalysis):
-    if usingAudioAnalysis:
-        return pd.DataFrame(columns=['song', 'affect', 'playlist'])
-    return pd.DataFrame( columns=['song', 'affect', 'playlist', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'type', 'id', 'uri', 'track_href', 'analysis_url', 'duration_ms', 'time_signature' ])
-
+    return CSVFilePath
 
 
 ############################################      "MAIN"      #######################################################
 
 
-playlistID = 'https://open.spotify.com/playlist/1XeIgTMom38iefhap6vrg0?si=77f58c8466bf4c7f'
+playlistID = 'https://open.spotify.com/playlist/0uiT9gi9uIrbtuj7NGHsYb?si=a743b183e4f84d06'
 #CSVFile = 'Rock Testing Concat.csv'
 
 affect = ['sad','anxious','energetic','excited','happy','calm','relaxed','depressed']
