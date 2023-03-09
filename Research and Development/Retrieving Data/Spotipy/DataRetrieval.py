@@ -77,9 +77,11 @@ def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
         dataSubFolderLocation = f'{affect}/'
     
     if CSVFileName == 'x':
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/' + dataSubFolderLocation+ playlistName
+        playlistName = playlistName.replace('/',' and ')
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation+ playlistName
     else:
-        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Analysis/'+ dataSubFolderLocation + CSVFileName
+        #check if CSVFileName has a \ in it, if so, then change it to not be treated as an escape character
+        CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/'+ dataSubFolderLocation + CSVFileName
 
     if CSVFilePath[-4:] != '.csv':
         CSVFilePath += '.csv'
@@ -89,7 +91,7 @@ def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
 ############################################      "MAIN"      #######################################################
 
 
-playlistID = 'https://open.spotify.com/playlist/0uiT9gi9uIrbtuj7NGHsYb?si=a743b183e4f84d06'
+playlistID = 'https://open.spotify.com/playlist/0B4cs8QCCEAurZstgs8cen?si=4cf0fe1961344b71'
 #CSVFile = 'Rock Testing Concat.csv'
 
 affect = ['sad','anxious','energetic','excited','happy','calm','relaxed','depressed']
