@@ -45,11 +45,11 @@ def getAllTracksFromPlaylist(playlistID):
     return tracks
 
 
-def getSongData(playlist, playlistName,  affect ):
+def getSongData(playlistBatch, playlistName,  affect ):
     songDataExtractedCount=0
     song_uris = []
     valid_song_indexes = []
-    for i, song in enumerate(playlist):
+    for i, song in enumerate(playlistBatch):
         if song['track'] is not None:
             song_uris.append(song['track']['uri'])
             valid_song_indexes.append(i)
@@ -58,13 +58,13 @@ def getSongData(playlist, playlistName,  affect ):
     for i, feature in enumerate(song_features):
         if feature is not None:
             song_index = valid_song_indexes[i]
-            songName = playlist[song_index]['track']['name']
+            songName = playlistBatch[song_index]['track']['name']
             song_features_with_metadata_batch.append(feature)
             song_features_with_metadata_batch[-1]['song'] = songName
             song_features_with_metadata_batch[-1]['playlist'] = playlistName
             song_features_with_metadata_batch[-1]['affect'] = affect
             songDataExtractedCount += 1
-    print(f"{songDataExtractedCount} of {len(playlist)} in batch extracted")
+    print(f"{songDataExtractedCount} of {len(playlistBatch)} in batch extracted")
     
     return song_features_with_metadata_batch
 
