@@ -101,7 +101,7 @@ def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
 
 
 playlistID = """
-https://open.spotify.com/playlist/2gxwsEcFCccHyTS2NrQA7U?si=4d0b8e0979e344cf
+https://open.spotify.com/playlist/0SkjBzvYwnDYQj9ncB6jEC?si=5aa86da6fb4a48d3
 """
 #CSVFile = 'Rock Testing Concat.csv'
 
@@ -113,5 +113,5 @@ affect = ['sad','angry','energetic','excited','happy','content','calm','depresse
 genre = ['rock','pop','metal','rap','country','latino','instrumental','EDM','R&B','Kpop']
 #           0      1     2       3      4       5          6            7     8     9
 
-getSongMetadataFromPlaylist(playlistID.splitlines()[1], affect[1], genre[1],showWarning=False)
+getSongMetadataFromPlaylist(playlistID.splitlines()[1], affect[0], genre[5],showWarning=False)
 #NOTE: Pop is a generally referring to playlists with a mix of other genres
