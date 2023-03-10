@@ -7,7 +7,7 @@ import pandas as pd
 sp = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials('bf1ba68423404778a60bcf3dee58d199','7365dc611a2d4ddba4ad61343f0b64d7'))
 
 #NOTE: playlistID is a string, preferably uri/url over href; HARD CODED PERSONAL PATH EXPORTING CSV and I expect CSVFileName to end in .csv
-def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x', dataSubFolderLocation = 'emotions'): 
+def getSongMetadataFromPlaylist(playlistID, affect,genre,CSVFileName='x', dataSubFolderLocation = 'emotions',showWarning=True): 
     playlistBatches = getAllTracksFromPlaylist(playlistID)
     playlistName = sp.playlist(playlistID)['name']
 
@@ -15,7 +15,8 @@ def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x', dataSubFolde
     
     for playlistBatch in playlistBatches:
         
-        allSongFeatures.extend(getSongData(playlistBatch, playlistName, affect))
+        allSongFeatures.extend(getSongData(playlistBatch, playlistName, affect,genre))
+
         
     df = pd.DataFrame(allSongFeatures)
 
@@ -23,8 +24,9 @@ def getSongMetadataFromPlaylist(playlistID, affect,CSVFileName='x', dataSubFolde
 
     df.to_csv(CSVFilePath, index=False)
     
-    print('Warning: I did not add a check to see if .csv file alread exists so it will overwrite the file if it already exists!')
-    print('Extracted', len(df), 'songs metadata from', playlistName,'.')
+    if showWarning:
+        print('Warning: I did not add a check to see if .csv file alread exists so it will overwrite the file if it already exists!')
+    print(f'Extracted {len(df)} songs metadata from {playlistName} as {affect}, {genre}.')
     return df
 
 
@@ -36,16 +38,16 @@ def getAllTracksFromPlaylist(playlistID):
     while True:
         playlist = sp.playlist_tracks(playlistID, offset=offset, limit=limit)['items']
         tracks.append(playlist)
-        
+        print("obtained batch", (offset//limit)+1, "of songs")
+
         if len(playlist) < limit:
             break
             
         offset += limit
-        print("obtained batch", offset//limit, "of songs")
     return tracks
 
 
-def getSongData(playlistBatch, playlistName,  affect ):
+def getSongData(playlistBatch, playlistName,  affect,genre ):
     songDataExtractedCount=0
     song_uris = []
     valid_song_indexes = []
@@ -63,6 +65,7 @@ def getSongData(playlistBatch, playlistName,  affect ):
             song_features_with_metadata_batch[-1]['song'] = songName
             song_features_with_metadata_batch[-1]['playlist'] = playlistName
             song_features_with_metadata_batch[-1]['affect'] = affect
+            song_features_with_metadata_batch[-1]['genre'] = genre
             songDataExtractedCount += 1
     print(f"{songDataExtractedCount} of {len(playlistBatch)} in batch extracted")
     
@@ -78,6 +81,12 @@ def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
     
     if CSVFileName == 'x':
         playlistName = playlistName.replace('/',' and ')
+        playlistName = playlistName.replace(':',' - ')
+        playlistName = playlistName.replace('?','')
+        playlistName = playlistName.replace('!','')
+        playlistName = playlistName.replace('(','')
+        playlistName = playlistName.replace(')','')
+        
         CSVFilePath = 'C:/Users/mlar5/OneDrive/Desktop/Code Folder/Python Projects/IRL projects/Aspire - Affective Computing Project/Playlists Data/Audio Features/' + dataSubFolderLocation+ playlistName
     else:
         #check if CSVFileName has a \ in it, if so, then change it to not be treated as an escape character
@@ -91,12 +100,18 @@ def exportPathToCSV(playlistName,  CSVFileName, dataSubFolderLocation,affect):
 ############################################      "MAIN"      #######################################################
 
 
-playlistID = 'https://open.spotify.com/playlist/0B4cs8QCCEAurZstgs8cen?si=4cf0fe1961344b71'
+playlistID = """
+https://open.spotify.com/playlist/2gxwsEcFCccHyTS2NrQA7U?si=4d0b8e0979e344cf
+"""
 #CSVFile = 'Rock Testing Concat.csv'
 
-affect = ['sad','anxious','energetic','excited','happy','calm','relaxed','depressed']
+affect = ['sad','angry','energetic','excited','happy','content','calm','depressed']
+#           0      1           2          3        4      5chill?    6         7
+
 #getSongMetadataFromPlaylist(playlistID, affect[1], CSVFile, usingAudioAnalysis=True)
 #dont have to use custom csv filename, as shown below!
+genre = ['rock','pop','metal','rap','country','latino','instrumental','EDM','R&B','Kpop']
+#           0      1     2       3      4       5          6            7     8     9
 
-getSongMetadataFromPlaylist(playlistID, affect[7])
-#print the current directory
+getSongMetadataFromPlaylist(playlistID.splitlines()[1], affect[1], genre[1],showWarning=False)
+#NOTE: Pop is a generally referring to playlists with a mix of other genres
