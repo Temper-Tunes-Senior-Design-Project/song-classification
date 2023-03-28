@@ -4,14 +4,16 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import datetime
 from sklearn.preprocessing import StandardScaler
+import requests
+
 
 
 
 #need to have credentials to access API
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth('86677c795a49463d9281fac012a87155','fe6f941da771447c920e02bbb2a82859', redirect_uri='http://localhost:5000',scope='user-library-read') )
+#sp = spotipy.Spotify(auth_manager=SpotifyOAuth('86677c795a49463d9281fac012a87155','fe6f941da771447c920e02bbb2a82859', redirect_uri='http://localhost:5000',scope='user-library-read') )
 
-def getTrackMoodsIntoDB(sp,model, user_prior_login_date=''):
-    features,track_ids = getRelevantTrackFeaturesOfUnlabelledLikedSongs(sp,user_prior_login_date=user_prior_login_date)
+def getTrackMoodsIntoDB(access_token,model,UID, user_prior_login_date=''):
+    features,track_ids = getRelevantTrackFeaturesOfUnlabelledLikedSongs(access_token,UID, user_prior_login_date=user_prior_login_date)
     preprocessedFeatures = clipAndNormalize(features)
     prediction, probablity = getMoodLabelMLP(model,preprocessedFeatures)
     #either this can return these 3 pieces of information or we can save them to the database and return nothing
@@ -19,13 +21,12 @@ def getTrackMoodsIntoDB(sp,model, user_prior_login_date=''):
 
 
 
-#Some version of this is needed to get the spotify metadata
-def getRelevantTrackFeaturesOfUnlabelledLikedSongs(sp,user_prior_login_date=''):
-    track_ids = retrieveTrackIds(sp, user_prior_login_date)
-    #track_ids = checkIdsInDatabase(track_ids)
-    features = retrieveTrackFeatures(sp, track_ids)
-    #saveTrackFeaturesToDatabase(features)
-    #updateUserLastLoginDate(sp)
+def getRelevantTrackFeaturesOfUnlabelledLikedSongs(access_token,UID,user_prior_login_date=''):
+    track_ids = retrieveTrackIds(access_token, user_prior_login_date)#supposed to be track_ids = retrieveTrackIdsToken(access_token, user_prior_login_date)
+#DB track_ids = checkIdsInDatabase(track_ids)
+    features = retrieveTrackFeatures(access_token, track_ids) 
+#DB saveTrackFeaturesToDatabase(features)  also maybe UID to update user info
+#DB updateUserLastLoginDate(UID)
     return features, track_ids
 
 def retrieveTrackIds(sp, user_prior_login_date):
@@ -54,6 +55,43 @@ def retrieveTrackIds(sp, user_prior_login_date):
     
     return track_ids
 
+def retrieveTrackIdsToken(access_token, user_prior_login_date):
+    print(access_token)
+    track_ids = []
+    offset = 0
+    limit = 50
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+    url = 'https://api.spotify.com/v1/me/tracks'
+    params = {'limit': limit, 'offset': offset}
+    endLoopEarly = False
+    while True:
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            liked_tracks = response.json()
+            for item in liked_tracks['items']:
+                if user_prior_login_date != '':
+                    if item['added_at'] > user_prior_login_date:
+                        track_ids.append(item['track']['uri'])
+                    else:
+                        endLoopEarly = True
+                        break
+                else:
+                    track_ids.append(item['track']['uri'])
+            offset += limit
+
+            if len(liked_tracks['items']) < limit or endLoopEarly:
+                # All tracks have been retrieved
+                break
+            params = {'limit': limit, 'offset': offset}
+        else:
+            print('Error: ', response.text)
+            break
+    return track_ids
+
+
 def checkIdsInDatabase(track_ids):
     #check if the track_ids are already in the database
     #if they are, remove them from the track_ids list
@@ -62,27 +100,34 @@ def checkIdsInDatabase(track_ids):
             track_ids.remove(track_id)
     return track_ids
 
-
-def retrieveTrackFeatures(sp, track_ids):
+def retrieveTrackFeatures(access_token, track_ids):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
     dfs = []
     for i in range(0, len(track_ids), 50):
-        # Retrieve track features with current offset
-        current_features = sp.audio_features(track_ids[i:i+50])
+        # Construct the URL for the current offset
+        url = 'https://api.spotify.com/v1/audio-features'
+        params = {'ids': ','.join(track_ids[i:i+50])}
         
-        # Convert to DataFrame
-        df = pd.DataFrame(current_features)
-        
-        # Remove columns that we don't need
-        df = df.drop(['type', 'uri', 'analysis_url', 'track_href','id'], axis=1)
-        
-        
-        # Append to list of dataframes
-        dfs.append(df)
+        # Make the request to the API
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            # Convert the response to a DataFrame
+            data = response.json()['audio_features']
+            df = pd.DataFrame(data)
+            
+            # Remove columns that we don't need
+            df = df.drop(['type', 'uri', 'analysis_url', 'track_href','id'], axis=1)
+            
+            # Append to list of dataframes
+            dfs.append(df)
+        else:
+            print('Error: ', response.status_code)
     
     # Concatenate all dataframes into a single one
     features_df = pd.concat(dfs, ignore_index=True)
-    
-    features = features_df.to_numpy()
     
     return features_df
 
@@ -93,9 +138,9 @@ def saveTrackFeaturesToDatabase(features):
         database[feature['id']] = feature
     return database
 
-def updateUserLastLoginDate(sp):
+def updateUserLastLoginDate(UID):
     #update the last login date in the database
-    database['user']['last_login_date'] = datetime.now()
+    database[UID]['last_login_date'] = datetime.now()
     return 
 
 
@@ -126,5 +171,5 @@ def getMoodLabelMLP(model,songFeautures):
         pred_probability=model.predict_proba(songFeautures)
         return prediction, pred_probability#, id
 
-features = getRelevantTrackFeaturesOfUnlabelledLikedSongs(sp)
-print(features)
+#features = getRelevantTrackFeaturesOfUnlabelledLikedSongs(sp)
+#print(features)
