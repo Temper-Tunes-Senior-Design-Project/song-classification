@@ -39,12 +39,12 @@ def retrieveTrackIds(sp, user_prior_login_date):
         for item in liked_tracks['items']:
             if user_prior_login_date != '':
                 if item['added_at']> user_prior_login_date:
-                    track_ids.append(item['track']['uri'])
+                    track_ids.append(item['track']['id'])
                 else:
                     endLoopEarly = True
                     break
             else:
-                track_ids.append(item['track']['uri'])
+                track_ids.append(item['track']['id'])
         offset += limit
         
         if len(liked_tracks['items']) < limit or endLoopEarly:
@@ -74,12 +74,12 @@ def retrieveTrackIdsToken(access_token, user_prior_login_date):
             for item in liked_tracks['items']:
                 if user_prior_login_date != '':
                     if item['added_at'] > user_prior_login_date:
-                        track_ids.append(item['track']['uri'])
+                        track_ids.append(item['track']['id'])
                     else:
                         endLoopEarly = True
                         break
                 else:
-                    track_ids.append(item['track']['uri'])
+                    track_ids.append(item['track']['id'])
             offset += limit
 
             if len(liked_tracks['items']) < limit or endLoopEarly:
