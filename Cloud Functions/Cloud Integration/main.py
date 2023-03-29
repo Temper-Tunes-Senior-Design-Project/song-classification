@@ -7,16 +7,18 @@ import os
 def get_variable(variable):
     return os.environ.get(variable, 'Specified environment variable is not set.')
 
-def tempFunc():
+def tempFunc(token):
     client = get_variable('SPOTIFY_CLIENT_ID')
     secret = get_variable('SPOTIFY_CLIENT_SECRET')
     redirect = get_variable('SPOTIFY_WEB_REDIRECT_URI')
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client,secret, redirect_uri=redirect,scope='user-library-read') )
+    #sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client,secret, redirect_uri=redirect,scope='user-library-read') )
+    sp = spotipy.Spotify(auth=token)
 
 @functions_framework.http
 def generate_user_classification(request):
     spotify_access_token = request.args['spotify_token']
     userID = request.args['uid']
+    tempFunc(spotify_access_token);
 
     print(userID, spotify_access_token)
     headers = {
