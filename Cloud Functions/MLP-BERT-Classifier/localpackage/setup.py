@@ -100,7 +100,31 @@ def checkIdsInDatabase(track_ids):
             track_ids.remove(track_id)
     return track_ids
 
-def retrieveTrackFeatures(access_token, track_ids):
+
+def retrieveTrackFeatures(sp, track_ids):
+    dfs = []
+    for i in range(0, len(track_ids), 50):
+        # Retrieve track features with current offset
+        current_features = sp.audio_features(track_ids[i:i+50])
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(current_features)
+        
+        # Remove columns that we don't need
+        df = df.drop(['type', 'uri', 'analysis_url', 'track_href','id'], axis=1)
+        
+        
+        # Append to list of dataframes
+        dfs.append(df)
+    
+    # Concatenate all dataframes into a single one
+    features_df = pd.concat(dfs, ignore_index=True)
+    
+    features = features_df.to_numpy()
+    
+    return features_df
+
+def retrieveTrackFeaturesToken(access_token, track_ids):
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
