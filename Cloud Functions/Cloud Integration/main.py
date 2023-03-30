@@ -15,6 +15,7 @@ Parameters
 def get_variable(variable):
     return os.environ.get(variable, 'Specified environment variable is not set.')
 
+
 '''
 Authenticates the user with the spotipy client
 ------------------------------------
@@ -26,8 +27,11 @@ def loadSpotipyClient(token):
     client = get_variable('SPOTIFY_CLIENT_ID')
     secret = get_variable('SPOTIFY_CLIENT_SECRET')
     redirect = get_variable('SPOTIFY_WEB_REDIRECT_URI')
-    #sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client,secret, redirect_uri=redirect,scope='user-library-read') )
-    return spotipy.Spotify(auth=token)
+    auth_manager = SpotifyOAuth(client, secret, redirect, scope='user-library-read')
+    if not auth_manager.validate_token(token):
+        return None
+    return spotipy.Spotify(auth_manager=auth_manager)
+
 
 '''
 Perform classification on all of the songs within a users liked song library
@@ -40,12 +44,13 @@ Parameters
 def generate_user_classification(request):
     spotify_access_token = request.args['spotify_token']
     userID = request.args['uid']
-    client = loadSpotipyClient(spotify_access_token);
-
     print(userID, spotify_access_token)
+    client = loadSpotipyClient(spotify_access_token)
 
-    prediction, probablity, track_ids= classifier.populateTrackMoods(spotify_access_token,userID,model)
-    pred_count = len(prediction)
+
+
+    prediction, probablity, track_ids = classifier.populateTrackMoods(client, model, userID)
+    #CORS-Policy Headers
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET',
