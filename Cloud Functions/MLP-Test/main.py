@@ -6,7 +6,7 @@ import numpy as np
 from flask import jsonify
 from google.cloud import storage
 
-def getMoodLabelMLP(request):
+def get_song_mood_mlp(request):
     # CORS POLICY
     if request.method == 'OPTIONS':
         # Allows GET requests from any origin with the Content-Type
@@ -38,26 +38,28 @@ def getMoodLabelMLP(request):
         # Load all files from storage bucket storage and instantiate
         storage_client = storage.Client()
 
-        bucket = storage_client.bucket('software-engineering-7af33.appspot.com')
-
+        bucket = storage_client.bucket('mood-swing-6c9d0.appspot.com')
         #setattr(sys.modules["__main__"],'NCF',NCF)
         blob = bucket.blob('MLP1.pkl')
         pickle_in = blob.download_as_string()
         model = pickle.loads(pickle_in)
+        
+
 
 
         #make a test example of a numpy array with the correct shape and import numpy
         testExample = np.array([-1.30196675,  0.80096565,  0.2161288 ,  0.62748397,  0.8056064 ,
             -0.15219274, -0.98604416, -0.54784952, -0.3229561 , -1.13850136,
                 0.1627538 ,  1.00204954,  0.18734159]).reshape(1, -1)
-        prediction = model.predict(testExample)
-        pred_probability=model.predict_proba(testExample)
+        
 
+        prediction = int(model.predict(testExample)[0])
+        pred_probability=model.predict_proba(testExample)[0].tolist()
         #return the label and the probability of the label
         return jsonify({"label":prediction, "probability":pred_probability}),200, headers
 
         #return prediction, pred_probability
-
+    return jsonify({"problem":"No song features were received to make a prediction"}), 200, headers
 """
         recommendations=''
      #recommendations = getUserRecommendationsShort(usersMovies,model,users,moviePool, links,movieTitles, usersCorrespondingClusters, medoidUsers)
