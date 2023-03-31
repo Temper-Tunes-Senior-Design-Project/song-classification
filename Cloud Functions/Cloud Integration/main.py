@@ -27,10 +27,13 @@ def loadSpotipyClient(token):
     client = get_variable('SPOTIFY_CLIENT_ID')
     secret = get_variable('SPOTIFY_CLIENT_SECRET')
     redirect = get_variable('SPOTIFY_WEB_REDIRECT_URI')
-    auth_manager = SpotifyOAuth(client, secret, redirect, scope='user-library-read')
-    if not auth_manager.validate_token(token):
-        return None
-    return spotipy.Spotify(auth_manager=auth_manager)
+    #client = '91654452e7694f638af81a18c8dedf2f'
+    #ecret = '89210f07be76488b90792983d9fe99a7'
+    #redirect = 'https://mood-swing-spotify-redirect.web.app'
+    print(client, secret, redirect, sep = "\n")
+    scopes = "app-remote-control,user-modify-playback-state,playlist-read-private,user-library-read"
+    auth_manager = SpotifyOAuth(client, secret, redirect, scope=scopes)
+    return spotipy.Spotify(auth=token, auth_manager=auth_manager)
 
 
 '''
@@ -44,12 +47,9 @@ Parameters
 def generate_user_classification(request):
     spotify_access_token = request.args['spotify_token']
     userID = request.args['uid']
-    print(userID, spotify_access_token)
     client = loadSpotipyClient(spotify_access_token)
 
-
-
-    prediction, probablity, track_ids = classifier.populateTrackMoods(client, model, userID)
+    prediction, probablity, track_ids = classifier.populateTrackMoods(client, userID)
     #CORS-Policy Headers
     headers = {
         'Access-Control-Allow-Origin': '*',
