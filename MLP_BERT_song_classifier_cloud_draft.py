@@ -47,7 +47,7 @@ def get_user_song_moods_advanced(sp_user,UID):
         #2. if possible, get the lyrics of the songs
 
         #make a dictionary of song titles and artist names
-        scraperInputs = getTitlesAndArtists(sp, remaining_track_ids)
+        scraperInputs = getTitlesAndArtists(sp_user, remaining_track_ids)
 
 
         all_lyrics_dict = {}
@@ -55,7 +55,7 @@ def get_user_song_moods_advanced(sp_user,UID):
                 #maybe add a sleep or something to prevent getting blocked
                 lyrics = Uriyafunction.scrapeLyrics(songInfo['artist(s)'],songInfo['title'])
                 if len(lyrics) > 0:
-                        all_lyrics[id]=lyrics
+                        all_lyrics_dict[id]=lyrics
 
 
         overlap_keys = [key for key in featuresDict.keys() if key in all_lyrics_dict.keys()]
@@ -208,7 +208,9 @@ def getTitlesAndArtists(sp, track_ids):
         tracks = sp.tracks(track_ids[i:i+50])
         for track in tracks['tracks']:
             title=track['name']
-            artists=track['artists'][0]['name']
+            artists=[]
+            for artist in track['artists']:
+                artists.append(artist['name'])
             titleArtistPairs[track['id']] = {'title':title,'artist(s)':artists}
 
     return titleArtistPairs
