@@ -6,6 +6,7 @@ import pickle
 from os import chdir
 import numpy as np
 import pandas as pd
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from bs4 import BeautifulSoup
 from bs4 import element
@@ -76,20 +77,18 @@ def get_user_song_moods_advanced(sp_user,UID):
                 chdir('C:/Users/mlar5/OneDrive/Desktop/Code Folder/198 Senior Design/Models/Spotipy')
                 #pickle in MLP model
                 MLP_model = pickle.load(open('MLP1.pkl', 'rb'))
+
                 #load in local copy of BERT model
-                BERT_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')#ADD PATH TO MODEL
-                BERT_Tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')#ADD PATH TO TOKENIZER
-                
+                BERT_model = AutoModelForSequenceClassification.from_pretrained("monologg/bert-base-cased-goemotions-original")
+                BERT_Tokenizer = AutoTokenizer.from_pretrained("monologg/bert-base-cased-goemotions-original")
+
                 #for first version, tokenize the lyrics and then pass then to the model inside the for loop
 
                 for key in overlap_keys.keys(): #- could probably be done in batches regardless
                         MLP_pred, MLP_pred_probability = getMoodLabelMLP(MLP_model,featuresDict[key])
 
-                        #tokenize lyrics
-                        BERT_input = tokenizer_function(all_lyrics_dict[key],BERT_Tokenizer)
-
-                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,BERT_input)
-
+                        #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
+                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])
                         if MLP_pred == BERT_pred:
                                 prediction = MLP_pred
                         else:
@@ -103,8 +102,8 @@ def get_user_song_moods_advanced(sp_user,UID):
                         predictions[key]=MLP_pred
 
                 for key in only_lyrics:
-                        BERT_input = tokenizer_function(all_lyrics_dict[key],BERT_Tokenizer)
-                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,BERT_input)
+                        #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
+                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])
                         predictions[key]=BERT_pred
 
                 DB.add_song_moods(predictions)
