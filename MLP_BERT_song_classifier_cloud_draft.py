@@ -7,6 +7,10 @@ from os import chdir
 import numpy as np
 import pandas as pd
 
+from bs4 import BeautifulSoup
+from bs4 import element
+from copy import deepcopy
+import re
 
 #________________________________________________________________________________________________________________
 
@@ -50,17 +54,14 @@ def get_user_song_moods_advanced(sp_user,UID):
         scraperInputs = getTitlesAndArtists(sp_user, remaining_track_ids)
 
 
-        all_lyrics_dict = {}
-        for id, songInfo in scraperInputs.items():
-                #maybe add a sleep or something to prevent getting blocked
-                lyrics = Uriyafunction.scrapeLyrics(songInfo['artist(s)'],songInfo['title'])
-                if len(lyrics) > 0:
-                        all_lyrics_dict[id]=lyrics
+        all_lyrics_dict = getScrapedLyrics(scraperInputs)
 
+        #MAYBE Tokenize THE LYRICS HERE (use batch processing?!) 
+        #would need to verify compute restrictions of cloud function first!
 
         overlap_keys = [key for key in featuresDict.keys() if key in all_lyrics_dict.keys()]
-        only_features = [key for key in featuresDict.keys() not in overlap_keys]
-        only_lyrics = [key for key in all_lyrics_dict.keys() not in overlap_keys]
+        only_features = [key for key in featuresDict.keys() if key not in overlap_keys]
+        only_lyrics = [key for key in all_lyrics_dict.keys() if key not in overlap_keys]
 
 
         #3 get predictions and update database
@@ -72,17 +73,22 @@ def get_user_song_moods_advanced(sp_user,UID):
         
         else:
                 predictions = {}
-                chdir('C:/Users/mlar5/OneDrive/Desktop/Code Folder/198 Senior Design/Models/Spotipy-data-models')
+                chdir('C:/Users/mlar5/OneDrive/Desktop/Code Folder/198 Senior Design/Models/Spotipy')
                 #pickle in MLP model
                 MLP_model = pickle.load(open('MLP1.pkl', 'rb'))
-                #load in BERT model
-                BERT_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-
+                #load in local copy of BERT model
+                BERT_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')#ADD PATH TO MODEL
+                BERT_Tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')#ADD PATH TO TOKENIZER
+                
+                #for first version, tokenize the lyrics and then pass then to the model inside the for loop
 
                 for key in overlap_keys.keys(): #- could probably be done in batches regardless
                         MLP_pred, MLP_pred_probability = getMoodLabelMLP(MLP_model,featuresDict[key])
 
-                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,lyrics[key])
+                        #tokenize lyrics
+                        BERT_input = tokenizer_function(all_lyrics_dict[key],BERT_Tokenizer)
+
+                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,BERT_input)
 
                         if MLP_pred == BERT_pred:
                                 prediction = MLP_pred
@@ -97,7 +103,8 @@ def get_user_song_moods_advanced(sp_user,UID):
                         predictions[key]=MLP_pred
 
                 for key in only_lyrics:
-                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,only_lyrics[key])
+                        BERT_input = tokenizer_function(all_lyrics_dict[key],BERT_Tokenizer)
+                        BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,BERT_input)
                         predictions[key]=BERT_pred
 
                 DB.add_song_moods(predictions)
@@ -112,7 +119,7 @@ def get_user_song_moods_advanced(sp_user,UID):
 
 #________________________________________________________________________________________________________________
 ### Helper Functions of get_User_Song_Moods_2_models
-
+#________________________________________________________________________________________________________________
 
 def retrieveTrackIds(sp, user_prior_login_date):
     track_ids = []
@@ -208,12 +215,114 @@ def getTitlesAndArtists(sp, track_ids):
         tracks = sp.tracks(track_ids[i:i+50])
         for track in tracks['tracks']:
             title=track['name']
+            #check if the track ends with (feat. artist) using a regex
+            if re.search(r' \(feat. .*\)$', title):
+                #remove the (feat. artist) from the title
+                title = re.sub(r' \(feat. .*\)$', '', title)
+
             artists=[]
             for artist in track['artists']:
                 artists.append(artist['name'])
             titleArtistPairs[track['id']] = {'title':title,'artist(s)':artists}
 
     return titleArtistPairs
+
+def getScrapedLyrics(scraperInputs):
+        all_lyrics_dict = {}
+        for id, songInfo in scraperInputs.items():
+                #maybe add a sleep or something to prevent getting blocked
+                lyrics = scrapeLyrics(songInfo['artist(s)'],songInfo['title'])
+                if len(lyrics) > 0:
+                        all_lyrics_dict[id]=lyrics
+        return all_lyrics_dict
+
+
+
+
+
+#________________________________________________________________________________________________________________
+#                  SCRPAER CODE
+#________________________________________________________________________________________________________________
+
+#Helps parse miscellaneous tags <i>, </br>, etc,.
+def _lyricsHelper(html, lyrics_list):
+    for tag in html.childGenerator():
+        if type(tag) == element.NavigableString:
+            _handleLyricAppend(lyrics_list, tag.text.strip())
+        elif tag.name == 'br' and lyrics_list[len(lyrics_list) - 1] != '':
+            lyrics_list.append('')
+        elif html.name == 'a':
+            _lyricsHelper(tag, lyrics_list)
+
+#Reads the HTML for lyrics dividers (if they exist) and appends the lyrics line by line to a list
+def _getLyricsFromHTML(html):
+    lyrics = html.findAll("div", {"data-lyrics-container" : "true"})
+    lyrics_list = ['']
+    for segment in lyrics:
+        for a in segment.childGenerator():
+            lyric = None
+            if type(a) == element.NavigableString:
+                lyric = a.strip()
+                _handleLyricAppend(lyrics_list, lyric)
+            else:
+                _lyricsHelper(a, lyrics_list)
+            if a.name == 'br' and lyrics_list[len(lyrics_list) - 1] != '':
+                lyrics_list.append('')
+    return lyrics_list
+
+#Helper function to handle appending and manipulating lyrics_list. A new line is generated only for </br> tags
+def _handleLyricAppend(lyrics_list, lyric):
+    if lyric is not None:
+        last_index = len(lyrics_list) - 1
+        #Handle special cases (parenthesis and symbols stick with words for instance)
+        if lyrics_list[last_index] != '' and (lyrics_list[last_index][-1] in ['(','[','{','<'] or lyric in [')',']','}','>','!','?',',','.']):
+            lyrics_list[last_index] += lyric
+        else:
+            lyrics_list[last_index] += " " + lyric if lyrics_list[last_index] != '' else lyric
+
+#Determines whether a song will need to be translated (returns the link if it does, otherwise returns None)
+def _getSongTranslationLink(html):
+    translation_tags = html.findAll('a', class_='TextButton-sc-192nsqv-0 hVAZmF LyricsControls__TextButton-sghmdv-6 hXTHjZ')
+    for tag in translation_tags:
+        if "english-translations" in tag['href']:
+            return tag['href']
+    return None
+
+#Determines whether a page exists
+def _pageExists(html):
+    return html.find('div', class_='render_404') == None
+        
+#function to scrape lyrics from genius, takes an array of artists, and songname
+def scrapeLyrics(artistnames, songname):
+    lyrics_list = []
+    found = False
+    i = 0
+    html = None
+    while i < len(artistnames) and not(found):
+        artistname = artistnames[i]
+        artistname2 = str(artistname.replace(' ','-')) if ' ' in artistname else str(artistname)
+        songname2 = str(songname.replace(' ','-')) if ' ' in songname else str(songname)
+        page_url = 'https://genius.com/'+ artistname2 + '-' + songname2 + '-' + 'lyrics'
+        page = requests.get(page_url)
+        html = BeautifulSoup(page.text, 'html.parser') 
+        found = _pageExists(html)
+        i += 1
+    if found:
+        #check if there is an english translation
+        translation_url = _getSongTranslationLink(html)
+        if translation_url is not None:
+            page = requests.get(translation_url)
+            html = BeautifulSoup(page.text, 'html.parser') 
+            lyrics_list = _getLyricsFromHTML(html)
+        else:
+            #If there isn't a translation, make sure it's in english in the first place
+            english = False
+            for script in html.findAll('script'):
+                if "language\\\":\\\"en" in str(script):
+                    english = True
+            if english: lyrics_list = _getLyricsFromHTML(html)
+    return lyrics_list
+    
 
 
 #________________________________________________________________________________________________________________
