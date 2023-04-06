@@ -87,7 +87,7 @@ def get_user_song_moods_advanced(sp_user,UID):
 
                 #for first version, tokenize the lyrics and then pass then to the model inside the for loop
 
-                for key in overlap_keys.keys(): #- could probably be done in batches regardless
+                for key in overlap_keys: #- could probably be done in batches regardless
                         MLP_pred, MLP_pred_probability = getMoodLabelMLP(featuresDict[key])
 
                         #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
