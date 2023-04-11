@@ -82,32 +82,43 @@ def get_user_song_moods_advanced(sp_user,UID):
         
         else:
                 predictions = {}
-                #chdir('C:/Users/mlar5/OneDrive/Desktop/Code Folder/198 Senior Design/Models/Spotipy')
-
-
                 #for first version, tokenize the lyrics and then pass then to the model inside the for loop
 
                 for key in overlap_keys: #- could probably be done in batches regardless
-                        MLP_pred, MLP_pred_probability = getMoodLabelMLP(featuresDict[key])
+                    MLP_pred, MLP_pred_probability = getMoodLabelMLP(featuresDict[key])
 
-                        #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
-                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])
-                        if MLP_pred == BERT_pred:
-                                prediction = MLP_pred
+                    #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
+                    BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])
+                    if MLP_pred == BERT_pred or MLP_flag == True:
+                        prediction = MLP_pred
+                    else:
+                        
+                        model_pred_diffs = (MLP_pred - BERT_pred)
+
+                        if MLP_pred > BERT_pred:
+                            sum_probabilities = MLP_pred + model_pred_diffs
                         else:
-                                #add probabilities and choose the label with the highest probability
-                                sum_probabilities = MLP_pred_probability + BERT_pred_probability
-                                prediction = np.argmax(sum_probabilities)
-                        predictions[key]=prediction
+                            sum_probabilities = MLP_pred - model_pred_diffs
+                        #if sum_probabilities outside of below 0, then do 8-sum_probabilities
+                        if sum_probabilities < 0:
+                            prediction = 8 + sum_probabilities
+                        elif sum_probabilities > 7:
+                            prediction = sum_probabilities - 7
+                        else:
+                            prediction = sum_probabilities
+
+                    predictions[key]=prediction
 
                 for key in only_features:
                         MLP_pred, MLP_pred_probability = getMoodLabelMLP(featuresDict[key])
                         predictions[key]=MLP_pred
 
+                #i dont think this case ever happens
                 for key in only_lyrics:
-                        #BERT_pred, BERT_pred_probability = getMoodLabelBERT(BERT_model,all_lyrics_dict[key])
-                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])
-                        predictions[key]=BERT_pred
+                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])#for this case, set disregard Neutral to false
+                        if rely_on_linear == False:
+
+                            predictions[key]=BERT_pred
 
                 DB.add_song_moods(predictions)
                 
@@ -267,9 +278,10 @@ emotion_dict = model.config.id2label
 def getOnlyMoodLabelFromLyrics(lyrics, emotion_dict=emotion_dict, emotionsAsValenceArousal=emotionsAsValenceArousal,printValenceArousal=False): #model=model, tokenizer=tokenizer,
     #device = 'cuda' if cuda.is_available() else 'cpu'
     
-    #load in local copy of BERT model with its local path INSTEAD OF THIS url (which is slow)
-    BERT_model = AutoModelForSequenceClassification.from_pretrained("monologg/bert-base-cased-goemotions-original")
-    BERT_Tokenizer = AutoTokenizer.from_pretrained("monologg/bert-base-cased-goemotions-original")
+    #change to ./path/goemotions_model
+    BERT_model = AutoModelForSequenceClassification.from_pretrained("monologg/bert-base-cased-goemotions-original",local_files_only=True)
+    #change to ./path/goemotions_tokenizer
+    BERT_Tokenizer = AutoTokenizer.from_pretrained("monologg/bert-base-cased-goemotions-original",local_files_only=True)
     mood,relyOnLinearModel = getMoodLabelFromLyrics(lyrics,BERT_model, BERT_Tokenizer, emotion_dict, emotionsAsValenceArousal, device='cpu',printValenceArousal=printValenceArousal)
     return mood,relyOnLinearModel
 
