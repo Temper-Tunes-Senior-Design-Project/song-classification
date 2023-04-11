@@ -86,7 +86,7 @@ def get_user_song_moods_advanced(sp_user,UID):
             DB.add_song_mood(track,prediction)
             DB.update_user_liked_songs(UID,track)
             DB.update_last_added_date(UID,added_at_date)
-        elif len(lyrics) > 0:
+        elif len(lyrics) > 0: #this case might never occur
             BERT_pred, rely_on_linear = getOnlyMoodLabelFromLyrics(lyrics)
             if rely_on_linear == False:
                 DB.add_song_mood(track,BERT_pred)
