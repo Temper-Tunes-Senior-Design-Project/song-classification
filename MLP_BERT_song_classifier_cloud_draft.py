@@ -113,13 +113,6 @@ def get_user_song_moods_advanced(sp_user,UID):
                         MLP_pred, MLP_pred_probability = getMoodLabelMLP(featuresDict[key])
                         predictions[key]=MLP_pred
 
-                #i dont think this case ever happens
-                for key in only_lyrics:
-                        BERT_pred, MLP_flag = getOnlyMoodLabelFromLyrics(all_lyrics_dict[key])#for this case, set disregard Neutral to false
-                        if rely_on_linear == False:
-
-                            predictions[key]=BERT_pred
-
                 DB.add_song_moods(predictions)
                 
                 DB.update_user_liked_songs(UID,predictions.keys()) 
