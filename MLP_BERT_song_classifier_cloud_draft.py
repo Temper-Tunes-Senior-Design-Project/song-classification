@@ -249,33 +249,35 @@ def getMoodLabelMLP(songFeautures):
         prediction = model.predict(songFeautures)
         pred_probability=model.predict_proba(songFeautures)
         return prediction, pred_probability
-#________________________________________________________________________________________________________________
-#                 BERT Sentiment Analysis Hard-coded info that needs to be used somewhere in the cloud
-#                (or just saved to a file and loaded in the cloud function)
-#________________________________________________________________________________________________________________
-
-model = AutoModelForSequenceClassification.from_pretrained("monologg/bert-base-cased-goemotions-original")
-tokenizer = AutoTokenizer.from_pretrained("monologg/bert-base-cased-goemotions-original")
-#^^these can be pickled and loaded in the future for the cloud OR called to from an endpoint
-
-emotionsAsValenceArousal= { 'admiration':(.6,.4),'amusement':(.6,.2),'anger':(-.8,.6),'annoyance':(-.6,.6),'approval':(.8,.6),'caring':(.6,-.2),'confusion':(-.2,.2),'curiosity':(0,.4),'desire':(.6,.6),'despair':(-.8,-.6),'disappointment':(-.6,-.6),'disapproval':(-.8,.65),'disgust':(-.8,.2),'embarrassment':(-.6,.4),'envy':(-.6,.4),'excitement':(.6,.8),'fear':(-.6,.8),'gratitude':(.6,-.6),'grief':(-.6,-.8),'gratitude':(.6,-.6),'grief':(-.6,-.8),'joy':(.8,.2),'love':(.8,.4),'nervousness':(-.4,.6),'optimism':(.6,.2),'pride':(.6,.1),'realization':(.2,.2),'relief':(.4,-.4),'remorse':(-.6,-.4),'sadness':(-.8,-.2),'surprise':(.2,.6),'neutral':(0,0)}
-
-emotion_dict = model.config.id2label
 
 #________________________________________________________________________________________________________________
 #                 BERT Sentiment Analysis Functions
 #________________________________________________________________________________________________________________
 
 
+def getOnlyMoodLabelFromLyrics(lyrics):
+    
+    #PART 1: DATA SETUP
+    moods = ['sad','angry','energetic','excited','happy','content','calm','depressed']
+    nums = [0, 1, 2, 3, 4, 5, 6, 7]
 
-def getOnlyMoodLabelFromLyrics(lyrics, emotion_dict=emotion_dict, emotionsAsValenceArousal=emotionsAsValenceArousal,printValenceArousal=False): #model=model, tokenizer=tokenizer,
+    # create dictionary mapping strings to integers
+    mood_to_num = {mood: num for mood,num in zip(moods,nums)}
+    
     #device = 'cuda' if cuda.is_available() else 'cpu'
     
     #change to ./path/goemotions_model
     BERT_model = AutoModelForSequenceClassification.from_pretrained("monologg/bert-base-cased-goemotions-original",local_files_only=True)
     #change to ./path/goemotions_tokenizer
     BERT_Tokenizer = AutoTokenizer.from_pretrained("monologg/bert-base-cased-goemotions-original",local_files_only=True)
-    mood,relyOnLinearModel = getMoodLabelFromLyrics(lyrics,BERT_model, BERT_Tokenizer, emotion_dict, emotionsAsValenceArousal, device='cpu',printValenceArousal=printValenceArousal)
+    emotionsAsValenceArousal= { 'admiration':(.6,.4),'amusement':(.6,.2),'anger':(-.8,.6),'annoyance':(-.6,.6),'approval':(.8,.6),'caring':(.6,-.2),'confusion':(-.2,.2),'curiosity':(0,.4),'desire':(.6,.6),'despair':(-.8,-.6),'disappointment':(-.6,-.6),'disapproval':(-.8,.65),'disgust':(-.8,.2),'embarrassment':(-.6,.4),'envy':(-.6,.4),'excitement':(.6,.8),'fear':(-.6,.8),'gratitude':(.6,-.6),'grief':(-.6,-.8),'gratitude':(.6,-.6),'grief':(-.6,-.8),'joy':(.8,.2),'love':(.8,.4),'nervousness':(-.4,.6),'optimism':(.6,.2),'pride':(.6,.1),'realization':(.2,.2),'relief':(.4,-.4),'remorse':(-.6,-.4),'sadness':(-.8,-.2),'surprise':(.2,.6),'neutral':(0,0)}
+
+    emotion_dict = BERT_model.config.id2label
+
+
+    #PART 2 - get the mood label
+    mood,relyOnLinearModel = getMoodLabelFromLyrics(lyrics,BERT_model, BERT_Tokenizer, emotion_dict, emotionsAsValenceArousal, device='cpu',printValenceArousal=False)
+    mood = mood_to_num[mood]
     return mood,relyOnLinearModel
 
 
