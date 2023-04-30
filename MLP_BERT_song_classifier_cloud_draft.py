@@ -1,4 +1,5 @@
 
+import requests
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.neural_network import MLPClassifier
 import pickle
@@ -188,28 +189,45 @@ def retrieveTrackFeatures(sp, track_ids):
     
     return features_df
 
+import scipy.stats as stats
+from sklearn.ensemble import RandomForestClassifier
+
 def clipAndNormalize(features):
     #clip the features to the range of the training data
-    features['danceability'] = features['danceability'].clip(lower=0.22718080000000002, upper=0.906)
-    features['energy'] = features['energy'].clip(lower=0.03545904, upper=0.978)
-    features['loudness'] = features['loudness'].clip(lower=-26.4981552, upper=-1.6015904000000007)
-    features['speechiness'] = features['speechiness'].clip(lower=0.0257, upper=0.46640959999999926)
-    features['acousticness'] = features['acousticness'].clip(lower=8.353136000000001e-05, upper=0.9884095999999992)
-    features['instrumentalness'] = features['instrumentalness'].clip(lower=0.0, upper=0.956)
-    features['liveness'] = features['liveness'].clip(lower=0.0494, upper=0.697)
-    features['valence'] = features['valence'].clip(lower=0.0382, upper=0.923)
-    features['tempo'] = features['tempo'].clip(lower=63.7631808, upper=188.00344319999996)
-    features['duration_ms'] = features['duration_ms'].clip(lower=88264.8768, upper=372339.1727999991)
+    features['danceability'] = features['danceability'].clip(lower=0.25336000000000003, upper=0.9188199999999997)
+    features['energy'] = features['energy'].clip(lower=0.047536, upper=0.982)
+    features['loudness'] = features['loudness'].clip(lower=-24.65708, upper=-0.8038200000000288)
+    features['speechiness'] = features['speechiness'].clip(lower=0.0263, upper=0.5018199999999997)
+    features['acousticness'] = features['acousticness'].clip(lower=1.4072e-04, upper=0.986)
+    features['instrumentalness'] = features['instrumentalness'].clip(lower=0.0, upper=0.951)
+    features['liveness'] = features['liveness'].clip(lower=0.044836, upper=0.7224599999999991)
+    features['valence'] = features['valence'].clip(lower=0.038318, upper=0.9348199999999998)
+    features['tempo'] = features['tempo'].clip(lower=66.34576, upper=189.87784)
+    features['duration_ms'] = features['duration_ms'].clip(lower=86120.0, upper=341848.79999999976)
     features['time_signature'] = features['time_signature'].clip(lower=3.0, upper=5.0)
     
+    columns_to_log=['liveness', 'instrumentalness', 'acousticness', 'speechiness','loudness','energy']
+
+    for i in columns_to_log:
+        if i == 'loudness':
+            features[i] = features[i] + 60
+        features[i] = np.log(features[i]+1)
+
     #normalize the data
-    scaler = pickle.load(open('scaler1.pkl', 'rb'))
+    scaler = pickle.load(open('scaler3.pkl', 'rb'))
     #fit on all columns except the track id
     rawfeatures = features.drop(['id'], axis=1)
     preprocessedFeatures = scaler.transform(rawfeatures)
 
     #convert to dictionary, with track id as key
     preprocessedFeatures = pd.DataFrame(preprocessedFeatures, columns=rawfeatures.columns)
+
+    
+    #apply z-score normalization
+    for i in columns_to_log:
+        preprocessedFeatures[i] = stats.zscore(preprocessedFeatures[i])
+        preprocessedFeatures.clip(lower=-2.7, upper=2.7, inplace=True)
+
     preprocessedFeatures['id']= features['id']
     preprocessedFeatures = preprocessedFeatures.set_index('id').T.to_dict('list')
     return preprocessedFeatures
